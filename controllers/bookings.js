@@ -108,6 +108,18 @@ exports.addBooking = async (req, res, next) => {
             });
         }
 
+        const existing = await Booking.findOne({
+            campground: req.params.campgroundId,
+            apptDate: req.body.apptDate
+        });
+
+        if (existing) {
+            return res.status(400).json({
+                success: false,
+                message: 'This campground is already booked on this date'
+            });
+        }
+
         // Validate nights count (max 3 nights)
         const n = Number(req.body.nightsCount);
         if (!Number.isInteger(n) || n < 1 || n > 3) {

@@ -14,12 +14,12 @@ const router = express.Router({ mergeParams: true });
 router
   .route('/')
   .get(getCampgrounds)
-  .post(protect, authorize('admin'), createCampground);
+  .post(protect, authorize('admin', 'campOwner'), createCampground);
 
 router
   .route('/:id')
   .get(getCampground)
-  .put(protect, authorize('admin'), updateCampground)
-  .delete(protect, authorize('admin'), deleteCampground);
+  .put(protect, authorize('admin','campOwner'), updateCampground)
+  .delete(protect, authorize('admin','campOwner'), deleteCampground);
 
 module.exports = router;
