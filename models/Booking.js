@@ -6,6 +6,12 @@ const BookingSchema = new mongoose.Schema({
         type: Date,
         required: true
     },
+    nightsCount: {
+        type: Number,
+        required: [true, 'Please add nightsCount'],
+        min: [1, 'Minimum nights is 1'],
+        max: [3, 'Maximum nights is 3']
+    },
     user: {
         type: mongoose.Schema.ObjectId,
         ref: 'User',

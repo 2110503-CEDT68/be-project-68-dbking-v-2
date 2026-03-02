@@ -109,10 +109,11 @@ exports.addBooking = async (req, res, next) => {
         }
 
         // Validate nights count (max 3 nights)
-        if (req.body.nightsCount && req.body.nightsCount > 3) {
+        const n = Number(req.body.nightsCount);
+        if (!Number.isInteger(n) || n < 1 || n > 3) {
             return res.status(400).json({
                 success: false,
-                message: 'Cannot book more than 3 nights'
+                message: 'nightsCount must be an integer between 1 and 3'
             });
         }
 
@@ -167,11 +168,14 @@ exports.updateBooking = async (req, res, next) => {
         }
 
         // Validate nights count if provided
-        if (req.body.nightsCount && req.body.nightsCount > 3) {
-            return res.status(400).json({
-                success: false,
-                message: 'Cannot book more than 3 nights'
-            });
+        if (req.body.nightsCount !== undefined) {
+            const n = Number(req.body.nightsCount);
+            if (!Number.isInteger(n) || n < 1 || n > 3) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'nightsCount must be an integer between 1 and 3'
+                });
+            }
         }
 
         booking = await Booking.findByIdAndUpdate(
