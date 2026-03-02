@@ -84,8 +84,6 @@ exports.getCampground = async (req, res, next) => {
 //@access   Private (Admin only)
 exports.createCampground = async (req, res, next) => {
     try {
-        req.body.owner = req.user.id;
-
         const campground = await Campground.create(req.body);
         res.status(201).json({ success: true, data: campground });
     } catch (err) {
@@ -99,24 +97,14 @@ exports.createCampground = async (req, res, next) => {
 //@access   Private (Admin only)
 exports.updateCampground = async (req, res, next) => {
     try {
-        let campground = await Campground.findById(req.params.id);
+        const campground = await Campground.findByIdAndUpdate(req.params.id, req.body, {
+            new: true,
+            runValidators: true
+        });
 
         if (!campground) {
             return res.status(400).json({ success: false });
         }
-
-        if (req.user.role !== 'admin' && campground.owner.toString() !== req.user.id) {
-            return res.status(403).json({
-                success: false,
-                message: 'Not authorized to update this campground'
-            });
-        }
-
-        campground = await Campground.findByIdAndUpdate(
-            req.params.id,
-            req.body,
-            { new: true, runValidators: true }
-        );
 
         res.status(200).json({ success: true, data: campground });
     } catch (err) {
@@ -133,13 +121,6 @@ exports.deleteCampground = async (req, res, next) => {
 
         if (!campground) {
             return res.status(400).json({ success: false });
-        }
-
-        if (req.user.role !== 'admin' && campground.owner.toString() !== req.user.id) {
-            return res.status(403).json({
-                success: false,
-                message: 'Not authorized to delete this campground'
-            });
         }
 
         // Delete all bookings associated with this campground
