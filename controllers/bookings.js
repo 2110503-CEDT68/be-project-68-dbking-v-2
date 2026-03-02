@@ -162,6 +162,25 @@ exports.addBooking = async (req, res, next) => {
             });
         }
 
+        // calculate nights so we can validate before hitting the database
+        const msPerDay = 24 * 60 * 60 * 1000;
+        const nightsCount = Math.ceil((newOut - newIn) / msPerDay);
+        if (nightsCount < 1) {
+            return res.status(400).json({
+                success: false,
+                message: 'Minimum stay is 1 night'
+            });
+        }
+        if (nightsCount > 3) {
+            return res.status(400).json({
+                success: false,
+                message: 'Maximum stay is 3 nights'
+            });
+        }
+
+        // include nightsCount in the body so the model has it (pre-save will recalc anyway)
+        req.body.nightsCount = nightsCount;
+
         // Create booking; pre-save hook will calculate nightsCount and validate date range
         const booking = await Booking.create(req.body);
 
@@ -172,6 +191,16 @@ exports.addBooking = async (req, res, next) => {
 
     } catch (error) {
         console.log(error);
+        // if we hit a mongoose validation error (including our pre-save throws), send 400
+        if (error.name === 'ValidationError' ||
+            error.message &&
+            (error.message.includes('Maximum stay') || error.message.includes('Minimum stay'))
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: error.message
+            });
+        }
         return res.status(500).json({
             success: false,
             message: 'Cannot create booking'
@@ -241,6 +270,22 @@ exports.updateBooking = async (req, res, next) => {
                     message: 'The updated dates overlap another booking'
                 });
             }
+
+            // validate nights count before saving
+            const msPerDay = 24 * 60 * 60 * 1000;
+            const nightsCount = Math.ceil((newOut - newIn) / msPerDay);
+            if (nightsCount < 1) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Minimum stay is 1 night'
+                });
+            }
+            if (nightsCount > 3) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Maximum stay is 3 nights'
+                });
+            }
         }
 
         // ensure client cannot override nightsCount
@@ -260,6 +305,15 @@ exports.updateBooking = async (req, res, next) => {
 
     } catch (error) {
         console.log(error);
+        if (error.name === 'ValidationError' ||
+            error.message &&
+            (error.message.includes('Maximum stay') || error.message.includes('Minimum stay'))
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: error.message
+            });
+        }
         return res.status(500).json({
             success: false,
             message: 'Cannot update booking'
