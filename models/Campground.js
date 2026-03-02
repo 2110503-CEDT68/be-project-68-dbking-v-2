@@ -32,11 +32,6 @@ const CampgroundSchema = new mongoose.Schema({
     region: {
         type: String,
         required: [true,'Please add a region']
-    },
-    owner: {
-        type: mongoose.Schema.ObjectId,
-        ref: 'User',
-        required: [true, 'Please add campground owner']
     }
 }, {
     toJSON: {virtuals:true},
