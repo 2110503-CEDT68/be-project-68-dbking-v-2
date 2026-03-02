@@ -79,11 +79,17 @@ exports.getCampground = async (req, res, next) => {
     }
 };
 
-//@desc     Create new campground (owner becomes requester)
+//@desc     Create new campground
 //@route    POST /api/v1/campgrounds
-//@access   Private (Admin or campOwner)
+//@access   Private (Admin only)
 exports.createCampground = async (req, res, next) => {
     try {
+        if (req.user.role !== 'admin') {
+            return res.status(401).json({
+                success: false,
+                message: 'Only administrators can create campgrounds'
+            });
+        }
         req.body.owner = req.user.id;
 
         const campground = await Campground.create(req.body);
@@ -124,22 +130,22 @@ exports.updateCampground = async (req, res, next) => {
     }
 };
 
-//@desc     Delete campground (admin or owner only)
+//@desc     Delete campground (admin only)
 //@route    DELETE /api/v1/campgrounds/:id
-//@access   Private (Admin or campOwner)
+//@access   Private (Admin only)
 exports.deleteCampground = async (req, res, next) => {
     try {
+        if (req.user.role !== 'admin') {
+            return res.status(401).json({
+                success: false,
+                message: 'Only administrators can delete campgrounds'
+            });
+        }
+
         const campground = await Campground.findById(req.params.id);
 
         if (!campground) {
             return res.status(400).json({ success: false });
-        }
-
-        if (req.user.role !== 'admin' && campground.owner.toString() !== req.user.id) {
-            return res.status(403).json({
-                success: false,
-                message: 'Not authorized to delete this campground'
-            });
         }
 
         // Delete all bookings associated with this campground

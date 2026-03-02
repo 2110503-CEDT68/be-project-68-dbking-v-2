@@ -34,15 +34,15 @@ const BookingSchema = new mongoose.Schema({
 });
 
 // pre-save hook calculates nightsCount and validates dates
-BookingSchema.pre('save', function(next) {
+BookingSchema.pre('save', async function() {
     // only run when dates are modified or new
     if (this.isModified('checkInDate') || this.isModified('checkOutDate')) {
         if (!this.checkInDate || !this.checkOutDate) {
-            return next(new Error('Both check-in and check-out dates are required'));
+            throw new Error('Both check-in and check-out dates are required');
         }
 
         if (this.checkOutDate <= this.checkInDate) {
-            return next(new Error('checkOutDate must be later than checkInDate'));
+            throw new Error('checkOutDate must be later than checkInDate');
         }
 
         // compute full days difference
@@ -51,13 +51,12 @@ BookingSchema.pre('save', function(next) {
         this.nightsCount = diff;
 
         if (this.nightsCount < 1) {
-            return next(new Error('Minimum stay is 1 night'));
+            throw new Error('Minimum stay is 1 night');
         }
         if (this.nightsCount > 3) {
-            return next(new Error('Maximum stay is 3 nights'));
+            throw new Error('Maximum stay is 3 nights');
         }
     }
-    next();
 });
 
 module.exports = mongoose.model('Booking',BookingSchema);
