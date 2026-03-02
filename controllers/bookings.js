@@ -108,22 +108,24 @@ exports.addBooking = async (req, res, next) => {
             });
         }
 
-        // Validate nights count (max 3 nights)
-        if (req.body.nightsCount && req.body.nightsCount > 3) {
+        const existing = await Booking.findOne({
+            campground: req.params.campgroundId,
+            apptDate: req.body.apptDate
+        });
+
+        if (existing) {
             return res.status(400).json({
                 success: false,
-                message: 'Cannot book more than 3 nights'
+                message: 'This campground is already booked on this date'
             });
         }
 
-        // Check for existing bookings by user
-        const existingBookings = await Booking.find({ user: req.user.id });
-
-        // If the user is not an admin, they can only create 3 bookings
-        if (existingBookings.length >= 3 && req.user.role !== 'admin') {
+        // Validate nights count (max 3 nights)
+        const n = Number(req.body.nightsCount);
+        if (!Number.isInteger(n) || n < 1 || n > 3) {
             return res.status(400).json({
                 success: false,
-                message: `The user with ID ${req.user.id} has already made 3 bookings`
+                message: 'nightsCount must be an integer between 1 and 3'
             });
         }
 
@@ -167,11 +169,14 @@ exports.updateBooking = async (req, res, next) => {
         }
 
         // Validate nights count if provided
-        if (req.body.nightsCount && req.body.nightsCount > 3) {
-            return res.status(400).json({
-                success: false,
-                message: 'Cannot book more than 3 nights'
-            });
+        if (req.body.nightsCount !== undefined) {
+            const n = Number(req.body.nightsCount);
+            if (!Number.isInteger(n) || n < 1 || n > 3) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'nightsCount must be an integer between 1 and 3'
+                });
+            }
         }
 
         booking = await Booking.findByIdAndUpdate(
