@@ -79,9 +79,9 @@ exports.getCampground = async (req, res, next) => {
     }
 };
 
-//@desc     Create new campground
+//@desc     Create new campground (owner becomes requester)
 //@route    POST /api/v1/campgrounds
-//@access   Private (Admin only)
+//@access   Private (Admin or campOwner)
 exports.createCampground = async (req, res, next) => {
     try {
         req.body.owner = req.user.id;
@@ -94,9 +94,9 @@ exports.createCampground = async (req, res, next) => {
     }
 };
 
-//@desc     Update campground
+//@desc     Update campground (admin or owner only)
 //@route    PUT /api/v1/campgrounds/:id
-//@access   Private (Admin only)
+//@access   Private (Admin or campOwner)
 exports.updateCampground = async (req, res, next) => {
     try {
         let campground = await Campground.findById(req.params.id);
@@ -124,9 +124,9 @@ exports.updateCampground = async (req, res, next) => {
     }
 };
 
-//@desc     Delete campground
+//@desc     Delete campground (admin or owner only)
 //@route    DELETE /api/v1/campgrounds/:id
-//@access   Private (Admin only)
+//@access   Private (Admin or campOwner)
 exports.deleteCampground = async (req, res, next) => {
     try {
         const campground = await Campground.findById(req.params.id);

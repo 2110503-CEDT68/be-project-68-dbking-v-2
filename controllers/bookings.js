@@ -8,25 +8,37 @@ exports.getBookings = async (req, res, next) => {
     try {
         let query;
 
-        // If user is admin, get all bookings
-        // Otherwise, get only user's bookings
-        if (req.user.role === 'admin') {
-            if (req.params.campgroundId) {
-                query = Booking.find({ campground: req.params.campgroundId })
-                    .populate({
-                        path: 'campground',
-                        select: 'name address tel'
-                    });
-            } else {
-                query = Booking.find()
-                    .populate({
-                        path: 'campground',
-                        select: 'name address tel'
-                    });
+        // if campgroundId is provided, allow admin or campground owner
+        if (req.params.campgroundId) {
+            const campground = await Campground.findById(req.params.campgroundId);
+            if (!campground) {
+                return res.status(404).json({
+                    success: false,
+                    message: `No campground with the id of ${req.params.campgroundId}`
+                });
             }
+            if (req.user.role !== 'admin' && campground.owner.toString() !== req.user.id) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Not authorized to view bookings for this campground'
+                });
+            }
+
+            query = Booking.find({ campground: req.params.campgroundId })
+                .populate({
+                    path: 'campground',
+                    select: 'name address tel'
+                });
         } else {
-            // Regular user can only see their own bookings
-            query = Booking.find({ user: req.user.id })
+            // only admins can request the full list when no campground is specified
+            if (req.user.role !== 'admin') {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Only administrators can view all bookings'
+                });
+            }
+
+            query = Booking.find()
                 .populate({
                     path: 'campground',
                     select: 'name address tel'
@@ -65,8 +77,14 @@ exports.getBooking = async (req, res, next) => {
             });
         }
 
-        // Make sure user is booking owner or admin
-        if (booking.user.toString() !== req.user.id && req.user.role !== 'admin') {
+        // Make sure user is booking owner, campground owner or admin
+        const bookingCampground = await Campground.findById(booking.campground);
+        const isCampOwner = bookingCampground && bookingCampground.owner.toString() === req.user.id;
+        if (
+            booking.user.toString() !== req.user.id &&
+            req.user.role !== 'admin' &&
+            !isCampOwner
+        ) {
             return res.status(401).json({
                 success: false,
                 message: `User ${req.user.id} is not authorized to view this booking`
@@ -98,6 +116,9 @@ exports.addBooking = async (req, res, next) => {
         // Add user to req.body
         req.body.user = req.user.id;
 
+        // ignore any nightsCount supplied by client
+        delete req.body.nightsCount;
+
         // Check if campground exists
         const campground = await Campground.findById(req.params.campgroundId);
 
@@ -108,28 +129,40 @@ exports.addBooking = async (req, res, next) => {
             });
         }
 
-        const existing = await Booking.findOne({
+        // ensure dates are present
+        const { checkInDate, checkOutDate } = req.body;
+        if (!checkInDate || !checkOutDate) {
+            return res.status(400).json({
+                success: false,
+                message: 'Both checkInDate and checkOutDate are required'
+            });
+        }
+
+        const newIn = new Date(checkInDate);
+        const newOut = new Date(checkOutDate);
+
+        if (newOut <= newIn) {
+            return res.status(400).json({
+                success: false,
+                message: 'checkOutDate must be later than checkInDate'
+            });
+        }
+
+        // overlap check: existing.checkInDate < newOut && existing.checkOutDate > newIn
+        const overlap = await Booking.findOne({
             campground: req.params.campgroundId,
-            apptDate: req.body.apptDate
+            checkInDate: { $lt: newOut },
+            checkOutDate: { $gt: newIn }
         });
 
-        if (existing) {
+        if (overlap) {
             return res.status(400).json({
                 success: false,
-                message: 'This campground is already booked on this date'
+                message: 'The requested dates overlap an existing booking'
             });
         }
 
-        // Validate nights count (max 3 nights)
-        const n = Number(req.body.nightsCount);
-        if (!Number.isInteger(n) || n < 1 || n > 3) {
-            return res.status(400).json({
-                success: false,
-                message: 'nightsCount must be an integer between 1 and 3'
-            });
-        }
-
-        // Create booking
+        // Create booking; pre-save hook will calculate nightsCount and validate date range
         const booking = await Booking.create(req.body);
 
         res.status(201).json({
@@ -160,33 +193,65 @@ exports.updateBooking = async (req, res, next) => {
             });
         }
 
-        // Make sure user is booking owner or admin
-        if (booking.user.toString() !== req.user.id && req.user.role !== 'admin') {
+        // Make sure user is booking owner, campground owner or admin
+        const bookingCampground = await Campground.findById(booking.campground);
+        const isCampOwner = bookingCampground && bookingCampground.owner.toString() === req.user.id;
+        if (
+            booking.user.toString() !== req.user.id &&
+            req.user.role !== 'admin' &&
+            !isCampOwner
+        ) {
             return res.status(401).json({
                 success: false,
                 message: `User ${req.user.id} is not authorized to update this booking`
             });
         }
 
-        // Validate nights count if provided
-        if (req.body.nightsCount !== undefined) {
-            const n = Number(req.body.nightsCount);
-            if (!Number.isInteger(n) || n < 1 || n > 3) {
+        // if dates are being updated, validate presence
+        const { checkInDate, checkOutDate } = req.body;
+        if ((checkInDate && !checkOutDate) || (!checkInDate && checkOutDate)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Both checkInDate and checkOutDate must be provided when updating dates'
+            });
+        }
+
+        // if dates provided, check for overlap excluding current booking
+        if (checkInDate && checkOutDate) {
+            const newIn = new Date(checkInDate);
+            const newOut = new Date(checkOutDate);
+
+            if (newOut <= newIn) {
                 return res.status(400).json({
                     success: false,
-                    message: 'nightsCount must be an integer between 1 and 3'
+                    message: 'checkOutDate must be later than checkInDate'
+                });
+            }
+
+            const overlap = await Booking.findOne({
+                campground: booking.campground,
+                _id: { $ne: booking._id },
+                checkInDate: { $lt: newOut },
+                checkOutDate: { $gt: newIn }
+            });
+
+            if (overlap) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'The updated dates overlap another booking'
                 });
             }
         }
 
-        booking = await Booking.findByIdAndUpdate(
-            req.params.id,
-            req.body,
-            {
-                new: true,
-                runValidators: true
-            }
-        );
+        // ensure client cannot override nightsCount
+        delete req.body.nightsCount;
+
+        // assign fields manually so that pre-save hook runs
+        if (Object.keys(req.body).length > 0) {
+            Object.assign(booking, req.body);
+        }
+        // save triggers pre hook to recalc nightsCount and validate
+        await booking.save();
 
         res.status(200).json({
             success: true,
@@ -216,8 +281,14 @@ exports.deleteBooking = async (req, res, next) => {
             });
         }
 
-        // Make sure user is booking owner or admin
-        if (booking.user.toString() !== req.user.id && req.user.role !== 'admin') {
+        // Make sure user is booking owner, campground owner or admin
+        const bookingCampground = await Campground.findById(booking.campground);
+        const isCampOwner = bookingCampground && bookingCampground.owner.toString() === req.user.id;
+        if (
+            booking.user.toString() !== req.user.id &&
+            req.user.role !== 'admin' &&
+            !isCampOwner
+        ) {
             return res.status(401).json({
                 success: false,
                 message: `User ${req.user.id} is not authorized to delete this booking`
