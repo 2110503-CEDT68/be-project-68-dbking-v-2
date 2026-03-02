@@ -1,0 +1,61 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+
+actor Guest
+actor User
+actor CampOwner as "campOwner"
+actor Admin
+
+rectangle "Campground Booking System (REST API)" {
+
+  usecase "Register" as UC1
+  usecase "Login" as UC2
+  usecase "Logout" as UC3
+
+  usecase "View campgrounds" as UC4
+  usecase "View campground detail" as UC5
+
+  usecase "Create booking\n(max 3 nights)" as UC6
+  usecase "View my bookings" as UC7
+  usecase "Edit my booking" as UC8
+  usecase "Delete my booking" as UC9
+
+  usecase "Create campground" as UC10
+  usecase "Update campground\n(own camp)" as UC11
+  usecase "Delete campground\n(own camp)" as UC12
+
+  usecase "View any bookings" as UC13
+  usecase "Edit any bookings" as UC14
+  usecase "Delete any bookings" as UC15
+}
+
+Guest --> UC1
+Guest --> UC2
+
+User --> UC3
+User --> UC4
+User --> UC5
+User --> UC6
+User --> UC7
+User --> UC8
+User --> UC9
+
+CampOwner --> UC3
+CampOwner --> UC4
+CampOwner --> UC5
+CampOwner --> UC10
+CampOwner --> UC11
+CampOwner --> UC12
+
+Admin --> UC3
+Admin --> UC4
+Admin --> UC5
+Admin --> UC10
+Admin --> UC11
+Admin --> UC12
+Admin --> UC13
+Admin --> UC14
+Admin --> UC15
+
+@enduml

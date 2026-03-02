@@ -1,0 +1,40 @@
+@startuml
+actor CampOwner
+participant "Postman/Client" as Client
+participant "Express API" as API
+participant "protect" as Protect
+participant "authorize(admin,campOwner)" as Authz
+participant "Campground Controller\nupdateCampground" as Ctl
+database "MongoDB" as DB
+
+CampOwner -> Client: Edit campground fields
+Client -> API: PUT /api/v1/campgrounds/{id}\nAuthorization: Bearer <token>
+
+API -> Protect: verify JWT
+Protect -> DB: User.findById(decoded.id)
+DB --> Protect: user(role=campOwner)
+Protect --> API: req.user
+
+API -> Authz: check role in {admin,campOwner}
+Authz --> API: ok
+
+API -> Ctl: updateCampground(req,res)
+Ctl -> DB: Campground.findById(id)
+DB --> Ctl: campground(ownerId)
+
+alt not found
+  Ctl --> API: 404
+  API --> Client: 404
+else found
+  alt not admin and ownerId != req.user.id
+    Ctl --> API: 403 Not authorized
+    API --> Client: 403
+  else ok
+    Ctl -> DB: Campground.findByIdAndUpdate(...)
+    DB --> Ctl: updated campground
+    Ctl --> API: 200 OK
+    API --> Client: 200 + data
+  end
+end
+
+@enduml

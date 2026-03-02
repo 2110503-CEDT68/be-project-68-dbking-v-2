@@ -1,0 +1,49 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+class User {
+  +ObjectId _id
+  +String name
+  +String tel
+  +String email
+  -String password
+  +String role {user|admin|campOwner}
+  +Date createdAt
+  --
+  +getSignedJwtToken(): String
+  +matchPassword(enteredPassword): boolean
+}
+
+class Campground {
+  +ObjectId _id
+  +String name
+  +String address
+  +String district
+  +String province
+  +String postalcode
+  +String tel
+  +String region
+  +ObjectId owner  // ref User
+  --
+  +bookings : Booking[*] <<virtual>>
+}
+
+class Booking {
+  +ObjectId _id
+  +Date apptDate
+  +int nightsCount (1..3)
+  +ObjectId user        // ref User
+  +ObjectId campground  // ref Campground
+  +Date createdAt
+}
+
+User "1" -- "0..*" Booking : makes >
+Campground "1" -- "0..*" Booking : has >
+User "1" -- "0..*" Campground : owns >
+
+note right of Booking
+Constraint:
+nightsCount in [1..3]
+end note
+
+@enduml

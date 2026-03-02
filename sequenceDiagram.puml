@@ -1,0 +1,45 @@
+@startuml
+actor User
+participant "Postman/Client" as Client
+participant "Express API" as API
+participant "protect middleware" as Protect
+participant "Booking Controller\naddBooking" as Ctl
+database "MongoDB" as DB
+
+User -> Client: Fill booking data
+Client -> API: POST /api/v1/campgrounds/{campgroundId}/bookings\nAuthorization: Bearer <token>\n{ apptDate, nightsCount }
+
+API -> Protect: verify JWT
+Protect -> DB: User.findById(decoded.id)
+DB --> Protect: user
+Protect --> API: req.user = user
+
+API -> Ctl: addBooking(req,res)
+
+Ctl -> DB: Campground.findById(campgroundId)
+DB --> Ctl: campground / null
+
+alt campground not found
+  Ctl --> API: 404 No campground
+  API --> Client: 404
+else found
+  Ctl -> DB: Booking.findOne({campground, apptDate})  // prevent duplicate
+  DB --> Ctl: existing / null
+
+  alt already booked
+    Ctl --> API: 400 already booked
+    API --> Client: 400
+  else available
+    Ctl -> Ctl: validate nightsCount (1..3)
+    alt invalid nightsCount
+      Ctl --> API: 400 nightsCount must be 1..3
+      API --> Client: 400
+    else ok
+      Ctl -> DB: Booking.create({user, campground, apptDate, nightsCount})
+      DB --> Ctl: new booking
+      Ctl --> API: 201 Created
+      API --> Client: 201 + booking
+    end
+  end
+end
+@enduml
