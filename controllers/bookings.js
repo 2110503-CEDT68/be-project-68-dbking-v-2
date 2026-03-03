@@ -4,40 +4,59 @@ const Campground = require('../models/Campground');
 //@desc     Get all bookings
 //@route    GET /api/v1/bookings
 //@access   Private
+// …existing code…
+
 exports.getBookings = async (req, res, next) => {
     try {
-        let query;
+        // admin can fetch everything;
+        // campground owners may fetch bookings **only** for a specific
+        // campground that they own; regular users are not permitted.
+        if (req.user.role !== 'admin') {
+            if (req.user.role === 'campOwner') {
+                // camp owners must supply a campground id
+                if (!req.params.campgroundId) {
+                    return res.status(401).json({
+                        success: false,
+                        message:
+                            'Campground owners must specify a campgroundId to list bookings'
+                    });
+                }
 
-        // if campgroundId is provided, allow admin or campground owner
-        if (req.params.campgroundId) {
-            const campground = await Campground.findById(req.params.campgroundId);
-            if (!campground) {
-                return res.status(404).json({
-                    success: false,
-                    message: `No campground with the id of ${req.params.campgroundId}`
-                });
-            }
-            if (req.user.role !== 'admin' && campground.owner.toString() !== req.user.id) {
+                // verify the campground exists and belongs to this owner
+                const campground = await Campground.findById(req.params.campgroundId);
+                if (!campground) {
+                    return res.status(404).json({
+                        success: false,
+                        message: `No campground with the id of ${req.params.campgroundId}`
+                    });
+                }
+                if (campground.owner.toString() !== req.user.id) {
+                    return res.status(401).json({
+                        success: false,
+                        message:
+                            'Not authorized to view bookings for this campground'
+                    });
+                }
+                // ownership confirmed; fall through to build query below
+            } else {
                 return res.status(401).json({
                     success: false,
-                    message: 'Not authorized to view bookings for this campground'
+                    message: 'Only administrators or campground owners can view bookings'
                 });
             }
+        }
 
+        let query;
+
+        if (req.params.campgroundId) {
+            // by this point, either admin or verified camp owner
             query = Booking.find({ campground: req.params.campgroundId })
                 .populate({
                     path: 'campground',
                     select: 'name address tel'
                 });
         } else {
-            // only admins can request the full list when no campground is specified
-            if (req.user.role !== 'admin') {
-                return res.status(401).json({
-                    success: false,
-                    message: 'Only administrators can view all bookings'
-                });
-            }
-
+            // admin only
             query = Booking.find()
                 .populate({
                     path: 'campground',

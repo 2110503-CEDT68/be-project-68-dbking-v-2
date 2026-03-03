@@ -90,7 +90,6 @@ exports.createCampground = async (req, res, next) => {
                 message: 'Only administrators can create campgrounds'
             });
         }
-        req.body.owner = req.user.id;
 
         const campground = await Campground.create(req.body);
         res.status(201).json({ success: true, data: campground });
